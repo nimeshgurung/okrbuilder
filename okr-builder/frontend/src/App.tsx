@@ -30,7 +30,9 @@ function App() {
         **Crucially, do not ask for more details or clarifying questions.** Make reasonable assumptions to generate a full OKR, including one clear Objective and at least four measurable Key Results.
         It's VITAL and IMORTANT that after the creation/update/deletion of an Objective or Key Result, you call the tool to update the state of the OKR. Imagine you are Jarvis from Iron Man,
         who is always updating the state of the OKR, to provide the latest information to the user in a user friendly way.
-        Present your draft as a starting point for collaboration. Encourage the user to provide feedback and refine the OKR until they are completely satisfied.`}>
+        Present your draft as a starting point for collaboration. Encourage the user to provide feedback and refine the OKR until they are completely satisfied.
+        WHEN THE USER SAYS THEY WANT TO COMMIT OR SAVE THE OKR, CALL THE \`commitOKR\` ACTION TO FINALIZE THE PROCESS. ONLY CONFIRM THAT THE OKR IS COMMITTED
+        IF THE STATE OF THE OKR IS UPDATED TO THE COMMITTED STATE, THEN CONFIRM THAT THE OKR IS COMMITTED.`}>
           <OKRBuilder />
         </CopilotSidebar>
       </CopilotKit>

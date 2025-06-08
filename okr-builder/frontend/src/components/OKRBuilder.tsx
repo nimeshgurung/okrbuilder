@@ -16,7 +16,7 @@ import {
 import { useCopilotChatSuggestions } from '@copilotkit/react-ui';
 import type { Objective, OKRAgentState } from '@shared/types';
 import { INITIAL_STATE } from '@shared/initial-state';
-import { ObjectiveCard } from './index';
+import { ObjectiveCard, ConfirmCommit } from './index';
 import { Role, TextMessage } from '@copilotkit/runtime-client-gql';
 import { useEffect, useRef } from 'react';
 
@@ -174,13 +174,74 @@ export default function OKRBuilder() {
     },
   });
 
+  useCopilotAction({
+    name: 'showOKRCommitConfirmation',
+    description: `
+    This action displays a confirmation dialog to commit an OKR.
+    IMPORTANT: This action does NOT automatically commit the OKR.
+    It only shows a confirmation dialog to the user.
+
+    To determine if an OKR was actually committed:
+    1. Check if the objective exists in state
+    2. Check if its status is 'committed'
+    3. Only then confirm the commit was successful
+
+    Example:
+    - User says "commit the OKR" -> Show confirmation dialog
+    - User clicks confirm -> Status changes to 'committed'
+    - Only NOW can you confirm "The OKR has been committed"
+    `,
+    parameters: [
+      {
+        name: 'objectiveId',
+        type: 'string',
+        description: 'The ID of the objective to potentially commit.',
+      },
+    ],
+    render: (props) => {
+      switch (props.status) {
+        case 'complete': {
+          const { args } = props as unknown as {
+            args: { objectiveId: string };
+          };
+          const objective = state.objectives?.find((o) => o.id === args.objectiveId);
+          if (!objective) return <></>;
+          return (
+            <ConfirmCommit
+              onConfirm={() => {
+                setState((prev) => {
+                  if (!prev) return INITIAL_STATE;
+                  return {
+                    ...prev,
+                    objectives: prev.objectives.map((o) =>
+                      o.id === args.objectiveId ? { ...o, status: 'committed' } : o,
+                    ),
+                  };
+                });
+              }}
+              onCancel={() => {}}
+            />
+          );
+        }
+        default:
+          return <></>;
+      }
+    },
+  });
+
   useCopilotChatSuggestions(
     {
       instructions: `
-      Suggest actions for creating and managing OKRs.
-      The user can create a new objective, ask for key results for an existing objective, or ask for a summary of progress.
+      I'm here to help you refine and enhance your Key Results. Looking at your objectives, I can suggest:
+      1. Additional specific, measurable key results that align with each objective
+      2. Ways to improve existing key result descriptions to be more actionable and measurable
+      3. Adjustments to make your key results more ambitious yet achievable
+      4. Better metrics and units to track progress effectively
 
-      Here is the current state of the OKRs:
+      Remember, great key results should be quantifiable and time-bound. Let me help you strengthen them.
+
+      It's VITAL and IMPORTANT that after any modifications to Key Results, I'll update the OKR state to reflect changes.
+      I'll keep you informed of the latest state in a clear, user-friendly way. Here's your current OKR state:
       ${JSON.stringify(state, null, 2)}
     `,
     },

@@ -15,10 +15,12 @@ export interface Objective {
   progress: number;
   isCompleted: boolean;
   quarter: string;
+  status?: 'draft' | 'committed';
 }
 
 export interface OKRAgentState {
   objectives: Objective[];
   currentQuarter: string;
   lastUpdated: string;
+  commitStatus: 'draft' | 'committed';
 }
