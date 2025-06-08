@@ -1,0 +1,102 @@
+Project: AI-Powered OKR Builder with Shared State (Node.js Backend)
+Objective: Transform the existing "Shared State Recipe Creator" demo into a collaborative OKR Builder. The new application will feature a React frontend and a standalone Node.js/Express backend, with real-time state synchronization powered by CopilotKit.
+
+Phase 1: Project Scaffolding & Backend Setup
+Goal: Establish the project structure with a separate Node.js backend and a React frontend.
+
+Task 1.1: Create Project Directories.
+
+Create a root directory for the project (e.g., okr-builder).
+Inside the root, create two subdirectories: frontend and backend.
+Task 1.2: Initialize the Node.js Backend.
+
+Navigate into the backend directory.
+Initialize a new Node.js project: npm init -y
+Install backend dependencies:
+Bash
+
+npm install express cors @langchain/openai @langchain/core langgraph @copilotkit/runtime @copilotkit/shared typescript ts-node-dev @types/express @types/cors @types/node
+Create a tsconfig.json file to configure TypeScript: npx tsc --init
+Task 1.3: Set Up the Express Server.
+
+In the backend directory, create a src folder and inside it, a file named index.ts.
+Write the basic Express server setup to listen on a port (e.g., 4000) and include the cors middleware.
+Task 1.4: Initialize the React Frontend.
+
+Navigate into the frontend directory.
+Create a new React application (e.g., using Vite for a fast setup):
+Bash
+
+npm create vite@latest . -- --template react-ts
+Install frontend dependencies:
+Bash
+
+npm install @copilotkit/react-core @copilotkit/react-ui @copilotkit/runtime-client-gql @mui/material @emotion/react @emotion/styled @mui/icons-material
+Install Material UI with Roboto font and Material Icons support.
+Phase 2: Defining Data Structures and State
+Goal: Model the data for OKRs and establish the initial state, making it accessible to both frontend and backend.
+
+Task 2.1: Create a Shared Types Directory.
+
+To avoid duplication, create a common or shared directory in the project root.
+Inside this shared directory, create a types.ts file. Define the KeyResult, Objective, and OKRAgentState interfaces here.
+Task 2.2: Configure TypeScript Paths.
+
+Update the tsconfig.json in both the frontend and backend to allow importing from this shared directory.
+Task 2.3: Establish Initial State.
+
+In the shared directory, create another file initial-state.ts and define the INITIAL_STATE constant. This ensures both frontend and backend start with the same data structure and default values.
+Phase 3: Building the LangGraph Agent in Node.js
+Goal: Implement the core logic of the AI agent within the Node.js/Express backend.
+
+Task 3.1: Integrate CopilotKit with Express.
+
+In your backend/src/index.ts, import CopilotRuntime from @copilotkit/runtime.
+Create an instance of CopilotRuntime.
+Set up a POST endpoint (e.g., /api/copilotkit) and use copilotRuntime.stream to handle requests from the frontend.
+Task 3.2: Create the LangGraph Agent.
+
+Create a new file backend/src/okr-agent.ts.
+Translate the fundamental structure of the Python shared_state_graph into TypeScript using LangGraph.js, as planned previously.
+The agent's state should use the OKRAgentState interface from the shared types directory.
+Task 3.3: Define Tools for OKR Management.
+
+In okr-agent.ts, define a tool named update_okrs. Use a library like Zod to define the schema for the tool's arguments, which should accept an array of objectives.
+Implement the function that updates the agent's state when the update_okrs tool is called.
+Task 3.4: Refine the System Prompt.
+
+Write a system prompt that instructs the AI on its role as an OKR coach and how to use the update_okrs tool effectively.
+Phase 4: Developing the React Frontend
+Goal: Create the user interface for displaying and interacting with the OKR data.
+
+Task 4.1: Configure CopilotKit in the Frontend.
+
+In your main React component (e.g., App.tsx), wrap your application with the <CopilotKit> provider.
+Set the runtimeUrl prop to point to your Node.js backend endpoint (e.g., "http://localhost:4000/api/copilotkit").
+Task 4.2: Create the OKRBuilder Component.
+
+Create a new component OKRBuilder.tsx. This component will use the useCoAgent hook to manage and sync state with the backend.
+Initialize its state with the INITIAL_STATE from the shared directory.
+Task 4.3: Develop ObjectiveCard and KeyResultItem Components.
+
+Build the UI components for displaying objectives and key results, as described in the original plan. These components will receive data and functions as props from OKRBuilder.
+Task 4.4: Implement UI for Editing OKRs.
+
+Add the necessary forms, buttons, and inputs to allow users to modify the OKRs. Each modification should call the setAgentState function from useCoAgent to sync the changes with the backend.
+Task 4.5: Style the Components.
+
+Use Material UI components and theming to create a clean and professional look. Configure a custom Material UI theme if needed for brand consistency.
+Phase 5: Integration and Final Touches
+Goal: Ensure seamless state synchronization between the React frontend and Node.js backend.
+
+Task 5.1: Run Both Services Concurrently.
+
+Use a tool like concurrently to start both the backend and frontend servers with a single command. Add a script to the root package.json for this.
+Task 5.2: Test the Bidirectional Data Flow.
+
+Perform thorough end-to-end testing:
+Make a change in the UI and verify the backend agent's state is updated.
+Use the chat to ask the AI to make a change, and verify the UI reflects this change instantly.
+Task 5.3: Refine Chat Suggestions and Prompts.
+
+Update the useCopilotChatSuggestions hook in the frontend with prompts relevant to building OKRs (e.g., "Suggest a new objective for Q3," "Make this key result more measurable").
