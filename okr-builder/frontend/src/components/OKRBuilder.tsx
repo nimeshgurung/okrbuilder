@@ -14,19 +14,23 @@ import {
   useCopilotChat,
 } from '@copilotkit/react-core';
 import { useCopilotChatSuggestions } from '@copilotkit/react-ui';
-import type { Objective, OKRAgentState } from '@shared/types';
-import { INITIAL_STATE } from '@shared/initial-state';
+import type { Objective as BaseObjective } from '@shared/types';
 import { ObjectiveCard, ConfirmCommit } from './index';
 import { Role, TextMessage } from '@copilotkit/runtime-client-gql';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+type ObjectiveWithStatus = BaseObjective & {
+  status: 'draft' | 'committed';
+};
 
 export default function OKRBuilder() {
-  const { state, setState } = useCoAgent<OKRAgentState>({
+  const { state, setState } = useCoAgent<ObjectiveWithStatus[]>({
     name: 'okr_agent',
-    initialState: INITIAL_STATE,
+    initialState: [],
   });
   const { appendMessage } = useCopilotChat();
   const isFirstRender = useRef(true);
+  const [objectiveToCommit, setObjectiveToCommit] = useState<ObjectiveWithStatus | null>(null);
 
   useEffect(() => {
     if (isFirstRender.current) {
@@ -54,19 +58,17 @@ export default function OKRBuilder() {
     description: 'The objective object.',
     attributes: [
       { name: 'id', type: 'string' as const, description: 'The objective ID.' },
-      { name: 'title', type: 'string' as const, description: 'The objective title.' },
-      { name: 'description', type: 'string' as const, description: 'The objective description.' },
+      { name: 'summary', type: 'string' as const, description: 'The objective summary.' },
       {
         name: 'keyResults',
         type: 'object[]' as const,
         description: 'The key results of the objective.',
         attributes: [
           { name: 'id', type: 'string' as const },
-          { name: 'description', type: 'string' as const },
+          { name: 'summary', type: 'string' as const },
           { name: 'progress', type: 'number' as const },
           { name: 'target', type: 'number' as const },
-          { name: 'unit', type: 'string' as const },
-          { name: 'isCompleted', type: 'boolean' as const },
+          { name: 'units', type: 'string' as const },
         ],
       },
     ],
@@ -77,43 +79,40 @@ export default function OKRBuilder() {
     description: 'Add an objective to the OKR list.',
     parameters: [objectiveParameter],
     handler: async (args) => {
-      const { objective } = args as unknown as { objective: Objective };
+      const { objective } = args as unknown as { objective: BaseObjective };
 
-      const newObjective: Objective = {
+      const newObjective: ObjectiveWithStatus = {
         ...objective,
         id: Date.now().toString(),
-        quarter: state.currentQuarter,
-        progress: 0,
-        isCompleted: false,
         keyResults: objective.keyResults || [],
+        status: 'draft',
       };
       setState((prevState) => {
-        if (!prevState) return INITIAL_STATE;
-        return {
-          ...prevState,
-          objectives: [...prevState.objectives, newObjective],
-          lastUpdated: new Date().toISOString(),
-        };
+        if (!prevState) return [newObjective];
+        return [...prevState, newObjective];
       });
       return newObjective;
     },
     render: ({ status, result, args }) => {
       if (status === 'inProgress') {
-        const { objective } = args as unknown as { objective: Objective };
+        const { objective } = args as unknown as { objective: BaseObjective };
         return (
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 2 }}>
             <CircularProgress size={20} />
-            <Typography>Adding objective: "{objective?.title || 'New Objective'}"...</Typography>
+            <Typography>Adding objective: "{objective?.summary || 'New Objective'}"...</Typography>
           </Box>
         );
       }
       if (status === 'complete') {
+        const currentObjective = state.find((o) => o.id === result.id);
+        if (!currentObjective) return <></>;
         return (
           <Box sx={{ maxWidth: 600, mt: 2 }}>
             <ObjectiveCard
-              objectiveId={result.id}
+              objective={currentObjective}
               onUpdate={updateObjective}
               onDelete={deleteObjective}
+              onCommit={() => setObjectiveToCommit(currentObjective)}
             />
           </Box>
         );
@@ -127,8 +126,8 @@ export default function OKRBuilder() {
     description: 'Update an objective in the OKR list.',
     parameters: [objectiveParameter],
     handler: async (args) => {
-      const { objective } = args as unknown as { objective: Objective };
-      updateObjective(objective);
+      const { objective } = args as unknown as { objective: BaseObjective };
+      updateObjective(objective as ObjectiveWithStatus);
       return objective;
     },
     render: ({ status, result }) => {
@@ -136,12 +135,15 @@ export default function OKRBuilder() {
         return <Typography sx={{ mt: 2 }}>Updating objective...</Typography>;
       }
       if (status === 'complete' && result) {
+        const currentObjective = state.find((o) => o.id === (result as BaseObjective).id);
+        if (!currentObjective) return <></>;
         return (
           <Box sx={{ maxWidth: 600, mt: 2 }}>
             <ObjectiveCard
-              objectiveId={result.id}
+              objective={currentObjective}
               onUpdate={updateObjective}
               onDelete={deleteObjective}
+              onCommit={() => setObjectiveToCommit(currentObjective)}
             />
           </Box>
         );
@@ -204,22 +206,21 @@ export default function OKRBuilder() {
           const { args } = props as unknown as {
             args: { objectiveId: string };
           };
-          const objective = state.objectives?.find((o) => o.id === args.objectiveId);
+          const objective = state?.find((o) => o.id === args.objectiveId);
           if (!objective) return <></>;
           return (
             <ConfirmCommit
               onConfirm={() => {
-                setState((prev) => {
-                  if (!prev) return INITIAL_STATE;
-                  return {
-                    ...prev,
-                    objectives: prev.objectives.map((o) =>
-                      o.id === args.objectiveId ? { ...o, status: 'committed' } : o,
-                    ),
-                  };
-                });
+                setState((prev) =>
+                  (prev || []).map((o) =>
+                    o.id === args.objectiveId ? { ...o, status: 'committed' } : o,
+                  ),
+                );
               }}
-              onCancel={() => {}}
+              onCancel={() => {
+                // Trigger a re-render to dismiss the action's UI
+                setState((prev) => [...(prev || [])]);
+              }}
             />
           );
         }
@@ -242,101 +243,91 @@ export default function OKRBuilder() {
 
       It's VITAL and IMPORTANT that after any modifications to Key Results, I'll update the OKR state to reflect changes.
       I'll keep you informed of the latest state in a clear, user-friendly way. Here's your current OKR state:
-      ${JSON.stringify(state, null, 2)}
+      ${JSON.stringify(
+        state.map((o) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const {  status, ...rest } = o;
+          return rest;
+        }),
+        null,
+        2,
+      )}
     `,
     },
     [state],
   );
 
   const addObjective = () => {
-    const newObjective: Objective = {
+    const newObjective: ObjectiveWithStatus = {
       id: Date.now().toString(),
-      title: 'New Objective',
-      description: 'Click to edit this objective',
-      quarter: state.currentQuarter,
-      progress: 0,
-      isCompleted: false,
+      summary: 'New Objective',
       keyResults: [],
+      status: 'draft',
     };
-
-    setState((prevState) => {
-      if (!prevState) return INITIAL_STATE;
-      return {
-        ...prevState,
-        objectives: [...prevState.objectives, newObjective],
-        lastUpdated: new Date().toISOString(),
-      };
-    });
+    setState((prevState) => [...(prevState || []), newObjective]);
   };
 
-  const updateObjective = (updatedObjective: Objective) => {
-    setState((prevState) => {
-      if (!prevState) return INITIAL_STATE;
-      return {
-        ...prevState,
-        objectives: prevState.objectives.map((obj) =>
-          obj.id === updatedObjective.id ? updatedObjective : obj,
-        ),
-        lastUpdated: new Date().toISOString(),
-      };
-    });
+  const updateObjective = (updatedObjective: ObjectiveWithStatus) => {
+    setState((prevState) =>
+      (prevState || []).map((o) => (o.id === updatedObjective.id ? updatedObjective : o)),
+    );
   };
 
   const deleteObjective = (objectiveId: string) => {
-    setState((prevState) => {
-      if (!prevState) return INITIAL_STATE;
-      return {
-        ...prevState,
-        objectives: prevState.objectives.filter(
-          (obj) => obj.id !== objectiveId,
-        ),
-        lastUpdated: new Date().toISOString(),
+    setState((prevState) => (prevState || []).filter((o) => o.id !== objectiveId));
+  };
+
+  const handleConfirmCommit = () => {
+    if (objectiveToCommit) {
+      const updatedObjective: ObjectiveWithStatus = {
+        ...objectiveToCommit,
+        status: 'committed',
       };
-    });
+      updateObjective(updatedObjective);
+      setObjectiveToCommit(null);
+    }
   };
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ my: 4 }}>
-        <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      <Paper elevation={2} sx={{ p: 3, position: 'relative' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mb: 3,
+          }}
+        >
+          <Typography variant="h4" component="h1">
+            My OKRs
+          </Typography>
+          <IconButton
+            color="primary"
+            aria-label="add objective"
+            onClick={addObjective}
           >
-            <div>
-              <Typography variant="h3" component="h1" gutterBottom>
-                OKR Builder
-              </Typography>
-              <Typography variant="h6" color="text.secondary">
-                {state.currentQuarter}
-              </Typography>
-            </div>
-            <IconButton
-              color="primary"
-              aria-label="add objective"
-              onClick={addObjective}
-              size="large"
-            >
-              <AddIcon fontSize="inherit" />
-            </IconButton>
-          </Box>
-        </Paper>
-
+            <AddIcon />
+          </IconButton>
+        </Box>
         <Stack spacing={3}>
-          {state.objectives.map((objective) => (
-            <Box key={objective.id} sx={{ maxWidth: 600 }}>
-              <ObjectiveCard
-                objectiveId={objective.id}
-                onUpdate={updateObjective}
-                onDelete={deleteObjective}
-              />
-            </Box>
+          {state?.map((objective) => (
+            <ObjectiveCard
+              key={objective.id}
+              objective={objective}
+              onUpdate={updateObjective}
+              onDelete={deleteObjective}
+              onCommit={() => setObjectiveToCommit(objective)}
+            />
           ))}
         </Stack>
-      </Box>
+        {objectiveToCommit && (
+          <ConfirmCommit
+            onConfirm={handleConfirmCommit}
+            onCancel={() => setObjectiveToCommit(null)}
+          />
+        )}
+      </Paper>
     </Container>
   );
 }

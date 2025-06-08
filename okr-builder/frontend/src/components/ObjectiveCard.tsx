@@ -21,70 +21,62 @@ import {
   ExpandMore as ExpandMoreIcon,
   Add as AddIcon
 } from '@mui/icons-material';
-import type { Objective, KeyResult, OKRAgentState } from '@shared/types';
-import { useCoAgent } from '@copilotkit/react-core';
+import type { Objective as BaseObjective, KeyResult } from '@shared/types';
 import KeyResultItem from './KeyResultItem';
 
+type ObjectiveWithStatus = BaseObjective & {
+  status: 'draft' | 'committed';
+};
+
 interface ObjectiveCardProps {
-  objectiveId: string;
-  onUpdate: (objective: Objective) => void;
+  objective: ObjectiveWithStatus;
+  onUpdate: (objective: ObjectiveWithStatus) => void;
   onDelete: (objectiveId: string) => void;
+  onCommit: (objectiveId: string) => void;
 }
 
 export default function ObjectiveCard({
-  objectiveId,
+  objective,
   onUpdate,
   onDelete,
+  onCommit,
 }: ObjectiveCardProps) {
-  const { state } = useCoAgent<OKRAgentState>({
-    name: 'okr_agent',
-  });
-
-  const objective = state.objectives?.find((o) => o.id === objectiveId) ?? null;
-
   const [isEditing, setIsEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState('');
-  const [editDescription, setEditDescription] = useState('');
+  const [editSummary, setEditSummary] = useState(objective.summary);
   const [expanded, setExpanded] = useState(false);
-
-  useState(() => {
-    if (objective) {
-      setEditTitle(objective.title);
-      setEditDescription(objective.description);
-    }
-  });
 
   if (!objective) {
     return null;
   }
 
   const handleSave = () => {
-    const updatedObjective: Objective = {
+    const updatedObjective: ObjectiveWithStatus = {
       ...objective,
-      title: editTitle,
-      description: editDescription
+      summary: editSummary,
     };
     onUpdate(updatedObjective);
     setIsEditing(false);
   };
 
   const handleCancel = () => {
-    setEditTitle(objective.title);
-    setEditDescription(objective.description);
+    setEditSummary(objective.summary);
     setIsEditing(false);
   };
 
   const addKeyResult = () => {
     const newKeyResult: KeyResult = {
       id: `${objective.id}-${Date.now()}`,
-      description: 'New key result',
-      progress: 0,
+      summary: 'New key result',
+      actualProgress: {
+        progress: 0,
+        percent: 0,
+        total: 100,
+      },
       target: 100,
-      unit: '%',
-      isCompleted: false
+      units: '%',
     };
 
-    const updatedObjective: Objective = {
+    const updatedObjective: ObjectiveWithStatus = {
       ...objective,
       keyResults: [...objective.keyResults, newKeyResult]
     };
@@ -92,30 +84,32 @@ export default function ObjectiveCard({
   };
 
   const updateKeyResult = (updatedKeyResult: KeyResult) => {
-    const updatedObjective: Objective = {
+    const updatedObjective: ObjectiveWithStatus = {
       ...objective,
       keyResults: objective.keyResults.map(kr =>
         kr.id === updatedKeyResult.id ? updatedKeyResult : kr
       )
     };
-
-    // Recalculate objective progress
-    const totalProgress = updatedObjective.keyResults.reduce((sum, kr) => {
-      const krProgress = Math.min((kr.progress / kr.target) * 100, 100);
-      return sum + krProgress;
-    }, 0);
-    updatedObjective.progress = Math.round(totalProgress / updatedObjective.keyResults.length) || 0;
-
     onUpdate(updatedObjective);
   };
 
   const deleteKeyResult = (keyResultId: string) => {
-    const updatedObjective: Objective = {
+    const updatedObjective: ObjectiveWithStatus = {
       ...objective,
       keyResults: objective.keyResults.filter(kr => kr.id !== keyResultId)
     };
     onUpdate(updatedObjective);
   };
+
+  const objectiveProgress =
+    objective.keyResults.length > 0
+      ? objective.keyResults.reduce((sum, kr) => {
+          const progress = kr.actualProgress?.progress || 0;
+          const target = kr.target || 0;
+          const krProgress = target > 0 ? (progress / target) * 100 : 0;
+          return sum + krProgress;
+        }, 0) / objective.keyResults.length
+      : 0;
 
   return (
     <Card elevation={2} sx={{ height: 'fit-content' }}>
@@ -126,21 +120,27 @@ export default function ObjectiveCard({
               <TextField
                 fullWidth
                 variant="outlined"
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
+                value={editSummary}
+                onChange={(e) => setEditSummary(e.target.value)}
                 sx={{ mb: 1 }}
                 size="small"
               />
             ) : (
               <Typography variant="h6" component="h2" gutterBottom>
-                {objective.title}
+                {objective.summary}
               </Typography>
             )}
           </Box>
           <Box display="flex" gap={1}>
             <Chip
-              label={`${objective.progress}%`}
-              color={objective.progress >= 75 ? 'success' : objective.progress >= 50 ? 'warning' : 'default'}
+              label={objective.status}
+              size="small"
+              color={objective.status === 'committed' ? 'success' : 'default'}
+              sx={{ textTransform: 'capitalize' }}
+            />
+            <Chip
+              label={`${Math.round(objectiveProgress)}%`}
+              color={objectiveProgress >= 75 ? 'success' : objectiveProgress >= 50 ? 'warning' : 'default'}
               size="small"
             />
           </Box>
@@ -152,21 +152,21 @@ export default function ObjectiveCard({
             multiline
             rows={2}
             variant="outlined"
-            value={editDescription}
-            onChange={(e) => setEditDescription(e.target.value)}
+            value={editSummary}
+            onChange={(e) => setEditSummary(e.target.value)}
             sx={{ mb: 2 }}
             size="small"
           />
         ) : (
           <Typography variant="body2" color="text.secondary" gutterBottom>
-            {objective.description}
+            {objective.summary}
           </Typography>
         )}
 
         <Box sx={{ mb: 2 }}>
           <LinearProgress
             variant="determinate"
-            value={objective.progress}
+            value={objectiveProgress}
             sx={{ height: 8, borderRadius: 4 }}
           />
         </Box>
@@ -230,6 +230,11 @@ export default function ObjectiveCard({
             >
               <DeleteIcon />
             </IconButton>
+            {objective.status === 'draft' && (
+              <Button size="small" onClick={() => onCommit(objective.id)}>
+                Commit
+              </Button>
+            )}
           </>
         )}
       </CardActions>

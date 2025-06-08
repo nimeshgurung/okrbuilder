@@ -16,7 +16,7 @@ import {
   Save as SaveIcon,
   Cancel as CancelIcon
 } from '@mui/icons-material';
-import type { KeyResult } from '@shared/types';
+import type { KeyResult, Progress } from '@shared/types';
 
 interface KeyResultItemProps {
   keyResult: KeyResult;
@@ -26,33 +26,38 @@ interface KeyResultItemProps {
 
 export default function KeyResultItem({ keyResult, onUpdate, onDelete }: KeyResultItemProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [editDescription, setEditDescription] = useState(keyResult.description);
-  const [editProgress, setEditProgress] = useState(keyResult.progress);
+  const [editSummary, setEditSummary] = useState(keyResult.summary);
+  const [editProgress, setEditProgress] = useState(keyResult.actualProgress?.progress);
   const [editTarget, setEditTarget] = useState(keyResult.target);
-  const [editUnit, setEditUnit] = useState(keyResult.unit);
+  const [editUnits, setEditUnits] = useState(keyResult.units);
 
   const handleSave = () => {
     const updatedKeyResult: KeyResult = {
       ...keyResult,
-      description: editDescription,
-      progress: editProgress,
+      summary: editSummary,
+      actualProgress: {
+        ...keyResult.actualProgress,
+        progress: editProgress,
+      } as Progress,
       target: editTarget,
-      unit: editUnit,
-      isCompleted: editProgress >= editTarget
+      units: editUnits,
     };
     onUpdate(updatedKeyResult);
     setIsEditing(false);
   };
 
   const handleCancel = () => {
-    setEditDescription(keyResult.description);
-    setEditProgress(keyResult.progress);
+    setEditSummary(keyResult.summary);
+    setEditProgress(keyResult.actualProgress?.progress);
     setEditTarget(keyResult.target);
-    setEditUnit(keyResult.unit);
+    setEditUnits(keyResult.units);
     setIsEditing(false);
   };
 
-  const progressPercentage = Math.min((keyResult.progress / keyResult.target) * 100, 100);
+  const progress = keyResult.actualProgress?.progress || 0;
+  const target = keyResult.target || 0;
+  const progressPercentage = target > 0 ? Math.min((progress / target) * 100, 100) : 0;
+  const isCompleted = progress >= target;
 
   return (
     <ListItem
@@ -72,9 +77,9 @@ export default function KeyResultItem({ keyResult, onUpdate, onDelete }: KeyResu
             fullWidth
             variant="outlined"
             size="small"
-            label="Description"
-            value={editDescription}
-            onChange={(e) => setEditDescription(e.target.value)}
+            label="Summary"
+            value={editSummary}
+            onChange={(e) => setEditSummary(e.target.value)}
             sx={{ mb: 2 }}
           />
           <Box display="flex" gap={1} mb={2}>
@@ -99,9 +104,9 @@ export default function KeyResultItem({ keyResult, onUpdate, onDelete }: KeyResu
             <TextField
               variant="outlined"
               size="small"
-              label="Unit"
-              value={editUnit}
-              onChange={(e) => setEditUnit(e.target.value)}
+              label="Units"
+              value={editUnits}
+              onChange={(e) => setEditUnits(e.target.value)}
               sx={{ flex: 1 }}
             />
           </Box>
@@ -118,17 +123,17 @@ export default function KeyResultItem({ keyResult, onUpdate, onDelete }: KeyResu
         <>
           <Box display="flex" justifyContent="space-between" alignItems="flex-start" width="100%">
             <ListItemText
-              primary={keyResult.description}
+              primary={keyResult.summary}
               secondary={
                 <Box sx={{ mt: 1 }}>
                   <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                     <Typography variant="caption">
-                      {keyResult.progress} / {keyResult.target} {keyResult.unit}
+                      {progress} / {target} {keyResult.units}
                     </Typography>
                     <Chip
                       label={`${Math.round(progressPercentage)}%`}
                       size="small"
-                      color={keyResult.isCompleted ? 'success' : progressPercentage >= 75 ? 'warning' : 'default'}
+                      color={isCompleted ? 'success' : progressPercentage >= 75 ? 'warning' : 'default'}
                     />
                   </Box>
                   <LinearProgress

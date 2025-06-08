@@ -1,26 +1,48 @@
-export interface KeyResult {
-  id: string;
-  description: string;
-  progress: number;
-  target: number;
-  unit: string;
-  isCompleted: boolean;
+export type KeyResult = {
+  __typename?: 'KeyResult';
+  id: Scalars['String'];
+  actualProgress?: Maybe<Progress>;
+  baseline?: Maybe<Scalars['Float']>;
+  benefitType?: Maybe<Scalars['String']>;
+  difficulty?: Maybe<KeyResultDifficulty>;
+  dueDate?: Maybe<Scalars['Instant']>;
+  priority?: Maybe<Scalars['String']>;
+  startDate?: Maybe<Scalars['Instant']>;
+  state?: Maybe<Scalars['String']>;
+  summary?: Maybe<Scalars['String']>;
+  target?: Maybe<Scalars['Float']>;
+  targetProgress?: Maybe<Progress>;
+  units?: Maybe<Scalars['String']>;
+};
+
+export enum KeyResultDifficulty {
+  Aspirational = 'Aspirational',
+  Committed = 'Committed',
+  Unset = 'Unset',
 }
 
-export interface Objective {
-  id: string;
-  title: string;
-  description: string;
+export type Progress = {
+  __typename?: 'Progress';
+  percent?: Maybe<Scalars['Float']>;
+  progress?: Maybe<Scalars['Float']>;
+  total?: Maybe<Scalars['Float']>;
+};
+
+export type Objective = {
+  __typename?: 'Objective';
+  id: Scalars['String'];
   keyResults: KeyResult[];
-  progress: number;
-  isCompleted: boolean;
-  quarter: string;
-  status?: 'draft' | 'committed';
-}
+  dueDate?: Maybe<Scalars['Instant']>;
+  priority?: Maybe<Scalars['String']>;
+  startDate?: Maybe<Scalars['Instant']>;
+  state?: Maybe<Scalars['String']>;
+  summary?: Maybe<Scalars['String']>;
+};
 
-export interface OKRAgentState {
-  objectives: Objective[];
-  currentQuarter: string;
-  lastUpdated: string;
-  commitStatus: 'draft' | 'committed';
+// These were not in the provided types, but are needed for the graphql types to work
+type Maybe<T> = T | null;
+type Scalars = {
+  String: string,
+  Float: number,
+  Instant: string, // Assuming Instant is a string in ISO 8601 format
 }
